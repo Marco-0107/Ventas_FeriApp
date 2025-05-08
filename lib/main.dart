@@ -5,14 +5,14 @@ import 'package:intl/intl.dart';
 import 'package:audioplayers/audioplayers.dart';
 
 void main() {
-  runApp(VentasMamaApp());
+  runApp(VentasFeriAPP());
 }
 
-class VentasMamaApp extends StatelessWidget {
+class VentasFeriAPP extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Ventas Mamá',
+      title: 'Ventas FeriAPP',
       theme: ThemeData(
         primarySwatch: Colors.green,
         scaffoldBackgroundColor: Color(0xFFF7F5F9),
@@ -54,7 +54,7 @@ class _SplashScreenState extends State<SplashScreen> {
       backgroundColor: Colors.green,
       body: Center(
         child: Text(
-          "Ventas Mamá",
+          "Ventas FeriAPP",
           style: TextStyle(color: Colors.white, fontSize: 32),
         ),
       ),
@@ -114,9 +114,9 @@ class InicioDiaPage extends StatelessWidget {
 }
 
 class Venta {
-  final String nombre;
-  final double valor;
-  final String fechaHora;
+  String nombre;
+  double valor;
+  String fechaHora;
 
   Venta(this.nombre, this.valor, this.fechaHora);
 
@@ -199,22 +199,34 @@ class _VentasPageState extends State<VentasPage> {
   }
 
   void cerrarDia() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? historial = prefs.getString("historial_dias");
-    List<dynamic> listaHistorial =
-        historial != null ? jsonDecode(historial) : [];
-    listaHistorial.add({
-      "fecha": DateFormat('yyyy-MM-dd').format(DateTime.now()),
-      "total": total,
-      "ventas": ventas.map((e) => e.toMap()).toList()
-    });
-    await prefs.setString("historial_dias", jsonEncode(listaHistorial));
-    await prefs.remove("ventas_dia");
-    setState(() {
-      ventas.clear();
-    });
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text("Día cerrado y guardado en historial con éxito!")));
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Confirmar cierre"),
+        content: Text("¿Estás seguro de que quieres cerrar el día?"),
+        actions: [
+          TextButton(child: Text("Cancelar"), onPressed: () => Navigator.pop(context, false)),
+          TextButton(child: Text("Sí"), onPressed: () => Navigator.pop(context, true)),
+        ],
+      ),
+    );
+
+    if (confirm ?? false) {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? historial = prefs.getString("historial_dias");
+      List<dynamic> listaHistorial =
+          historial != null ? jsonDecode(historial) : [];
+      listaHistorial.add({
+        "fecha": DateFormat('yyyy-MM-dd').format(DateTime.now()),
+        "total": total,
+        "ventas": ventas.map((e) => e.toMap()).toList()
+      });
+      await prefs.setString("historial_dias", jsonEncode(listaHistorial));
+      await prefs.remove("ventas_dia");
+      setState(() {
+        ventas.clear();
+      });
+    }
   }
 
   void irAHistorial() {
@@ -225,7 +237,7 @@ class _VentasPageState extends State<VentasPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Ventas Mamá'),
+        title: Text('Ventas FeriAPP'),
         actions: [
           IconButton(
             icon: Icon(Icons.history),
@@ -281,6 +293,8 @@ class _VentasPageState extends State<VentasPage> {
               'Total: \$${total.toStringAsFixed(0)}',
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.green),
             ),
+            SizedBox(height: 5),
+            Text("Hecha por Marco Cerda con ayuda de ChatGPT - v1.0.1", style: TextStyle(fontSize: 12)),
           ],
         ),
       ),
@@ -317,39 +331,8 @@ class HistorialPage extends StatelessWidget {
               final dia = historial[index];
               return ListTile(
                 title: Text('Fecha: ${dia['fecha']} - Total: \$${dia['total']}'),
-                onTap: () {
-                  Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => DetalleDiaPage(ventas: dia['ventas'], fecha: dia['fecha']),
-                  ));
-                },
               );
             },
-          );
-        },
-      ),
-    );
-  }
-}
-
-class DetalleDiaPage extends StatelessWidget {
-  final List ventas;
-  final String fecha;
-
-  DetalleDiaPage({required this.ventas, required this.fecha});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Ventas del $fecha'),
-      ),
-      body: ListView.builder(
-        itemCount: ventas.length,
-        itemBuilder: (context, index) {
-          final venta = ventas[index];
-          return ListTile(
-            title: Text('${venta['nombre']} - \$${venta['valor'].toStringAsFixed(0)}'),
-            subtitle: Text('Fecha y hora: ${venta['fechaHora']}'),
           );
         },
       ),
