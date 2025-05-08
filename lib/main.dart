@@ -294,7 +294,7 @@ class _VentasPageState extends State<VentasPage> {
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.green),
             ),
             SizedBox(height: 5),
-            Text("Hecha por Marco Cerda con ayuda de ChatGPT - v1.0.1", style: TextStyle(fontSize: 12)),
+            Text("Creada por tu hijo Marco Cerda con mucho amor ❤️", style: TextStyle(fontSize: 12)),
           ],
         ),
       ),
@@ -302,37 +302,80 @@ class _VentasPageState extends State<VentasPage> {
   }
 }
 
-class HistorialPage extends StatelessWidget {
-  Future<List<Map<String, dynamic>>> cargarHistorial() async {
+class HistorialPage extends StatefulWidget {
+  @override
+  _HistorialPageState createState() => _HistorialPageState();
+}
+
+class _HistorialPageState extends State<HistorialPage> {
+  List<Map<String, dynamic>> historial = [];
+
+  @override
+  void initState() {
+    super.initState();
+    cargarHistorial();
+  }
+
+  Future<void> cargarHistorial() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? historial = prefs.getString("historial_dias");
-    if (historial != null) {
-      return List<Map<String, dynamic>>.from(jsonDecode(historial));
+    String? datos = prefs.getString("historial_dias");
+    if (datos != null) {
+      setState(() {
+        historial = List<Map<String, dynamic>>.from(jsonDecode(datos));
+      });
     }
-    return [];
+  }
+
+  void eliminarDia(int index) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    historial.removeAt(index);
+    await prefs.setString("historial_dias", jsonEncode(historial));
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Historial de Días'),
-      ),
-      body: FutureBuilder<List<Map<String, dynamic>>>(
-        future: cargarHistorial(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return Center(child: CircularProgressIndicator());
-          }
-          final historial = snapshot.data!;
-          return ListView.builder(
-            itemCount: historial.length,
-            itemBuilder: (context, index) {
-              final dia = historial[index];
-              return ListTile(
-                title: Text('Fecha: ${dia['fecha']} - Total: \$${dia['total']}'),
-              );
+      appBar: AppBar(title: Text("Historial de Días")),
+      body: ListView.builder(
+        itemCount: historial.length,
+        itemBuilder: (context, index) {
+          final dia = historial[index];
+          return ListTile(
+            title: Text("Fecha: ${dia['fecha']} - Total: \$${dia['total']}"),
+            trailing: IconButton(
+              icon: Icon(Icons.delete, color: Colors.red),
+              onPressed: () => eliminarDia(index),
+            ),
+            onTap: () {
+              Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => DetalleDiaPage(ventas: dia['ventas'], fecha: dia['fecha']),
+              ));
             },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class DetalleDiaPage extends StatelessWidget {
+  final List ventas;
+  final String fecha;
+
+  DetalleDiaPage({required this.ventas, required this.fecha});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text("Ventas del $fecha")),
+      body: ListView.builder(
+        itemCount: ventas.length,
+        itemBuilder: (context, index) {
+          final venta = ventas[index];
+          return ListTile(
+            title: Text("${venta['nombre']} - \$${venta['valor'].toStringAsFixed(0)}"),
+            subtitle: Text("Fecha y hora: ${venta['fechaHora']}"),
           );
         },
       ),

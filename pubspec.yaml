@@ -1,5 +1,5 @@
 name: ventas_feriapp
-description: Aplicación de ventas para la feria
+description: Aplicación para registrar ventas en la feria
 publish_to: 'none'
 version: 1.0.1+1
 
