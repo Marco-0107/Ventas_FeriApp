@@ -87,7 +87,12 @@ class FelicitarMamaPage extends StatelessWidget {
                 Navigator.of(context).pushReplacement(
                     MaterialPageRoute(builder: (_) => InicioDiaPage()));
               },
-              child: Text("Continuar"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.green,
+              ),
+              child: Text("Continuar",
+                  style: TextStyle(fontWeight: FontWeight.bold)),
             )
           ],
         ),
@@ -205,8 +210,11 @@ class _VentasPageState extends State<VentasPage> {
         title: Text("Confirmar cierre"),
         content: Text("¿Estás seguro de que quieres cerrar el día?"),
         actions: [
-          TextButton(child: Text("Cancelar"), onPressed: () => Navigator.pop(context, false)),
-          TextButton(child: Text("Sí"), onPressed: () => Navigator.pop(context, true)),
+          TextButton(
+              child: Text("Cancelar"),
+              onPressed: () => Navigator.pop(context, false)),
+          TextButton(
+              child: Text("Sí"), onPressed: () => Navigator.pop(context, true)),
         ],
       ),
     );
@@ -230,7 +238,8 @@ class _VentasPageState extends State<VentasPage> {
   }
 
   void irAHistorial() {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => HistorialPage()));
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => HistorialPage()));
   }
 
   @override
@@ -278,11 +287,33 @@ class _VentasPageState extends State<VentasPage> {
                 itemBuilder: (context, index) {
                   final venta = ventas[index];
                   return ListTile(
-                    title: Text('${venta.nombre} - \$${venta.valor.toStringAsFixed(0)}'),
+                    title: Text(
+                        '${venta.nombre} - \$${venta.valor.toStringAsFixed(0)}'),
                     subtitle: Text('Fecha y hora: ${venta.fechaHora}'),
                     trailing: IconButton(
                       icon: Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => eliminarVenta(index),
+                      onPressed: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: Text("¿Eliminar esta venta?"),
+                            content: Text(
+                                "¿Estás seguro de que deseas eliminar esta venta del día?"),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: Text("Cancelar"),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                child: Text("Eliminar",
+                                    style: TextStyle(color: Colors.red)),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirm ?? false) eliminarVenta(index);
+                      },
                     ),
                   );
                 },
@@ -291,10 +322,14 @@ class _VentasPageState extends State<VentasPage> {
             SizedBox(height: 10),
             Text(
               'Total: \$${total.toStringAsFixed(0)}',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.green),
+              style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green),
             ),
             SizedBox(height: 5),
-            Text("Creada por tu hijo Marco Cerda con mucho amor ❤️", style: TextStyle(fontSize: 12)),
+            Text("Creada por Marco Cerda con mucho amor ❤️ - v1.0.1",
+                style: TextStyle(fontSize: 12)),
           ],
         ),
       ),
@@ -345,11 +380,33 @@ class _HistorialPageState extends State<HistorialPage> {
             title: Text("Fecha: ${dia['fecha']} - Total: \$${dia['total']}"),
             trailing: IconButton(
               icon: Icon(Icons.delete, color: Colors.red),
-              onPressed: () => eliminarDia(index),
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: Text("¿Eliminar este día?"),
+                    content: Text(
+                        "¿Estás seguro de que deseas eliminar el historial del día ${dia['fecha']}?"),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: Text("Cancelar"),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: Text("Eliminar",
+                            style: TextStyle(color: Colors.red)),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm ?? false) eliminarDia(index);
+              },
             ),
             onTap: () {
               Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => DetalleDiaPage(ventas: dia['ventas'], fecha: dia['fecha']),
+                builder: (_) =>
+                    DetalleDiaPage(ventas: dia['ventas'], fecha: dia['fecha']),
               ));
             },
           );
@@ -359,23 +416,99 @@ class _HistorialPageState extends State<HistorialPage> {
   }
 }
 
-class DetalleDiaPage extends StatelessWidget {
+class DetalleDiaPage extends StatefulWidget {
   final List ventas;
   final String fecha;
 
   DetalleDiaPage({required this.ventas, required this.fecha});
 
   @override
+  _DetalleDiaPageState createState() => _DetalleDiaPageState();
+}
+
+class _DetalleDiaPageState extends State<DetalleDiaPage> {
+  List ventasEditable = [];
+
+  @override
+  void initState() {
+    super.initState();
+    ventasEditable = List.from(widget.ventas);
+  }
+
+  void editarVenta(int index) async {
+    TextEditingController nombreController =
+        TextEditingController(text: ventasEditable[index]['nombre']);
+    TextEditingController valorController =
+        TextEditingController(text: ventasEditable[index]['valor'].toString());
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Editar Venta"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nombreController,
+              decoration: InputDecoration(labelText: "Nombre"),
+            ),
+            TextField(
+              controller: valorController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(labelText: "Valor"),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text("Cancelar")),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text("Guardar")),
+        ],
+      ),
+    );
+
+    if (confirm ?? false) {
+      setState(() {
+        ventasEditable[index]['nombre'] = nombreController.text;
+        ventasEditable[index]['valor'] =
+            double.tryParse(valorController.text) ?? 0;
+      });
+      // Guardar inmediatamente los cambios en SharedPreferences
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? historial = prefs.getString("historial_dias");
+      if (historial != null) {
+        List<dynamic> historialList = jsonDecode(historial);
+        for (var dia in historialList) {
+          if (dia['fecha'] == widget.fecha) {
+            dia['ventas'] = ventasEditable;
+            // ✅ ACTUALIZAMOS EL TOTAL
+            double nuevoTotal = ventasEditable.fold(
+                0.0, (sum, venta) => sum + (venta['valor'] ?? 0));
+            dia['total'] = nuevoTotal;
+            break;
+          }
+        }
+        await prefs.setString("historial_dias", jsonEncode(historialList));
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Ventas del $fecha")),
+      appBar: AppBar(title: Text("Ventas del ${widget.fecha}")),
       body: ListView.builder(
-        itemCount: ventas.length,
+        itemCount: ventasEditable.length,
         itemBuilder: (context, index) {
-          final venta = ventas[index];
+          final venta = ventasEditable[index];
           return ListTile(
-            title: Text("${venta['nombre']} - \$${venta['valor'].toStringAsFixed(0)}"),
+            title: Text(
+                "${venta['nombre']} - \$${venta['valor'].toStringAsFixed(0)}"),
             subtitle: Text("Fecha y hora: ${venta['fechaHora']}"),
+            onTap: () => editarVenta(index),
           );
         },
       ),
