@@ -32,11 +32,10 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     Future.delayed(Duration(seconds: 2), () async {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      bool firstTime = prefs.getBool("first_time") ?? true;
-
+      final prefs = await SharedPreferences.getInstance();
+      final firstTime = prefs.getBool('first_time') ?? true;
       if (firstTime) {
-        await prefs.setBool("first_time", false);
+        await prefs.setBool('first_time', false);
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => FelicitarMamaPage()),
         );
@@ -54,7 +53,7 @@ class _SplashScreenState extends State<SplashScreen> {
       backgroundColor: Colors.green,
       body: Center(
         child: Text(
-          "Ventas FeriAPP",
+          'Ventas FeriAPP',
           style: TextStyle(color: Colors.white, fontSize: 32),
         ),
       ),
@@ -71,13 +70,11 @@ class FelicitarMamaPage extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              "¡Feliz Día Mamá!",
-              style: TextStyle(color: Colors.white, fontSize: 32),
-            ),
+            Text('¡Feliz Día Lore y Mimi!',
+                style: TextStyle(color: Colors.white, fontSize: 32)),
             SizedBox(height: 20),
             Text(
-              "Esta app es para ayudarte en la feria, hecha con mucho amor 💚",
+              'Esta app es para ayudarles en la feria, hecha con mucho amor 💚',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.white, fontSize: 18),
             ),
@@ -85,15 +82,16 @@ class FelicitarMamaPage extends StatelessWidget {
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (_) => InicioDiaPage()));
+                  MaterialPageRoute(builder: (_) => InicioDiaPage()),
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: Colors.green,
               ),
-              child: Text("Continuar",
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-            )
+              child:
+                  Text('Continuar', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
           ],
         ),
       ),
@@ -107,10 +105,11 @@ class InicioDiaPage extends StatelessWidget {
     return Scaffold(
       body: Center(
         child: ElevatedButton(
-          child: Text("Iniciar Día de Trabajo"),
+          child: Text('Iniciar Día de Trabajo'),
           onPressed: () {
             Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => VentasPage()));
+              MaterialPageRoute(builder: (_) => VentasPage()),
+            );
           },
         ),
       ),
@@ -125,21 +124,17 @@ class Venta {
 
   Venta(this.nombre, this.valor, this.fechaHora);
 
-  Map<String, dynamic> toMap() {
-    return {
-      'nombre': nombre,
-      'valor': valor,
-      'fechaHora': fechaHora,
-    };
-  }
+  Map<String, dynamic> toMap() => {
+        'nombre': nombre,
+        'valor': valor,
+        'fechaHora': fechaHora,
+      };
 
-  factory Venta.fromMap(Map<String, dynamic> map) {
-    return Venta(
-      map['nombre'],
-      map['valor'],
-      map['fechaHora'],
-    );
-  }
+  factory Venta.fromMap(Map<String, dynamic> map) => Venta(
+        map['nombre'] as String,
+        (map['valor'] as num).toDouble(),
+        map['fechaHora'] as String,
+      );
 }
 
 class VentasPage extends StatefulWidget {
@@ -147,99 +142,127 @@ class VentasPage extends StatefulWidget {
   _VentasPageState createState() => _VentasPageState();
 }
 
-class _VentasPageState extends State<VentasPage> {
+class _VentasPageState extends State<VentasPage> with TickerProviderStateMixin {
   final List<Venta> ventas = [];
-  final TextEditingController nombreController = TextEditingController();
-  final TextEditingController valorController = TextEditingController();
+  final nombreController = TextEditingController();
+  final valorController = TextEditingController();
   final player = AudioPlayer();
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
-    cargarVentas();
-  }
-
-  double get total => ventas.fold(0, (sum, venta) => sum + venta.valor);
-
-  Future<void> cargarVentas() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? datos = prefs.getString("ventas_dia");
-    if (datos != null) {
-      List<dynamic> lista = jsonDecode(datos);
-      setState(() {
-        ventas.clear();
-        ventas.addAll(lista.map((e) => Venta.fromMap(e)).toList());
+    _tabController = TabController(length: 2, vsync: this)
+      ..addListener(() {
+        if (!_tabController.indexIsChanging) {
+          _loadVentas();
+          nombreController.clear();
+          valorController.clear();
+        }
       });
-    }
+    _loadVentas();
   }
 
-  Future<void> guardarVentas() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    List<Map<String, dynamic>> lista = ventas.map((e) => e.toMap()).toList();
-    prefs.setString("ventas_dia", jsonEncode(lista));
-  }
+  String get _salesKey =>
+      _tabController.index == 0 ? 'lore_ventas' : 'mimi_ventas';
 
-  void agregarVenta() async {
-    final String nombre = nombreController.text;
-    final double? valor = double.tryParse(valorController.text);
-    final String fechaHora =
-        DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now());
+  double get total => ventas.fold(0.0, (sum, v) => sum + v.valor);
 
-    if (nombre.isNotEmpty && valor != null) {
-      setState(() {
-        ventas.add(Venta(nombre, valor, fechaHora));
-        nombreController.clear();
-        valorController.clear();
-      });
-      await guardarVentas();
-      await player.play(AssetSource('sounds/success.mp3'));
-    }
-  }
-
-  void eliminarVenta(int index) async {
+  Future<void> _loadVentas() async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = prefs.getString(_salesKey);
     setState(() {
-      ventas.removeAt(index);
+      ventas.clear();
+      if (data != null) {
+        final list = jsonDecode(data) as List<dynamic>;
+        ventas.addAll(list.map((e) => Venta.fromMap(e as Map<String, dynamic>)));
+      }
     });
-    await guardarVentas();
   }
 
-  void cerrarDia() async {
-    final confirm = await showDialog<bool>(
+  Future<void> _saveVentas() async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = ventas.map((v) => v.toMap()).toList();
+    await prefs.setString(_salesKey, jsonEncode(list));
+  }
+
+  void _addVenta() async {
+    final nombre = nombreController.text;
+    final val = double.tryParse(valorController.text);
+    final fechaHora = DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now());
+    if (nombre.isNotEmpty && val != null) {
+      setState(() => ventas.add(Venta(nombre, val, fechaHora)));
+      await _saveVentas();
+      await player.play(AssetSource('sounds/success.mp3'));
+      nombreController.clear();
+      valorController.clear();
+    }
+  }
+
+  void _editVenta(int i) async {
+    final nCtrl = TextEditingController(text: ventas[i].nombre);
+    final vCtrl = TextEditingController(text: ventas[i].valor.toString());
+    final ok = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text("Confirmar cierre"),
-        content: Text("¿Estás seguro de que quieres cerrar el día?"),
+      builder: (_) => AlertDialog(
+        title: Text('Editar Venta'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: nCtrl, decoration: InputDecoration(labelText: 'Nombre')),
+            TextField(controller: vCtrl, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: 'Valor')),
+          ],
+        ),
         actions: [
-          TextButton(
-              child: Text("Cancelar"),
-              onPressed: () => Navigator.pop(context, false)),
-          TextButton(
-              child: Text("Sí"), onPressed: () => Navigator.pop(context, true)),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: Text('Guardar')),
         ],
       ),
     );
-
-    if (confirm ?? false) {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      String? historial = prefs.getString("historial_dias");
-      List<dynamic> listaHistorial =
-          historial != null ? jsonDecode(historial) : [];
-      listaHistorial.add({
-        "fecha": DateFormat('yyyy-MM-dd').format(DateTime.now()),
-        "total": total,
-        "ventas": ventas.map((e) => e.toMap()).toList()
-      });
-      await prefs.setString("historial_dias", jsonEncode(listaHistorial));
-      await prefs.remove("ventas_dia");
+    if (ok ?? false) {
       setState(() {
-        ventas.clear();
+        ventas[i].nombre = nCtrl.text;
+        ventas[i].valor = double.tryParse(vCtrl.text) ?? ventas[i].valor;
       });
+      await _saveVentas();
     }
   }
 
-  void irAHistorial() {
-    Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => HistorialPage()));
+  void _removeVenta(int i) async {
+    setState(() => ventas.removeAt(i));
+    await _saveVentas();
+  }
+
+  void _closeDay() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Confirmar cierre'),
+        content: Text('¿Seguro que quieres cerrar el día?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: Text('Sí')),
+        ],
+      ),
+    );
+    if (confirm ?? false) {
+      final prefs = await SharedPreferences.getInstance();
+      final key = _tabController.index == 0 ? 'lore_historial' : 'mimi_historial';
+      final hData = prefs.getString(key);
+      final hist = hData != null ? jsonDecode(hData) as List : [];
+      hist.add({
+        'fecha': DateFormat('yyyy-MM-dd').format(DateTime.now()),
+        'total': total,
+        'ventas': ventas.map((v) => v.toMap()).toList(),
+      });
+      await prefs.setString(key, jsonEncode(hist));
+      await prefs.remove(_salesKey);
+      setState(() => ventas.clear());
+    }
+  }
+
+  void _openHistory() {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => HistorialPage()));
   }
 
   @override
@@ -247,91 +270,78 @@ class _VentasPageState extends State<VentasPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Ventas FeriAPP'),
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: [Tab(text: 'Lore'), Tab(text: 'Mimi')],
+        ),
         actions: [
-          IconButton(
-            icon: Icon(Icons.history),
-            onPressed: irAHistorial,
-          ),
-          IconButton(
-            icon: Icon(Icons.close),
-            onPressed: cerrarDia,
-          ),
+          IconButton(icon: Icon(Icons.history), onPressed: _openHistory),
+          IconButton(icon: Icon(Icons.close), onPressed: _closeDay),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            TextField(
-              controller: nombreController,
-              decoration: InputDecoration(labelText: 'Nombre del producto'),
-            ),
-            TextField(
-              controller: valorController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(labelText: 'Valor'),
-            ),
-            SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: agregarVenta,
-              child: Text('Agregar Venta'),
-            ),
-            SizedBox(height: 20),
-            Text(
-              'Ventas del día',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            Expanded(
-              child: ListView.builder(
-                itemCount: ventas.length,
-                itemBuilder: (context, index) {
-                  final venta = ventas[index];
-                  return ListTile(
-                    title: Text(
-                        '${venta.nombre} - \$${venta.valor.toStringAsFixed(0)}'),
-                    subtitle: Text('Fecha y hora: ${venta.fechaHora}'),
-                    trailing: IconButton(
-                      icon: Icon(Icons.delete, color: Colors.red),
-                      onPressed: () async {
-                        final confirm = await showDialog<bool>(
+      body: TabBarView(
+        controller: _tabController,
+        children: [_ventasView(), _ventasView()],
+      ),
+    );
+  }
+
+  Widget _ventasView() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          TextField(
+            controller: nombreController,
+            decoration: InputDecoration(labelText: 'Nombre del producto'),
+          ),
+          TextField(
+            controller: valorController,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(labelText: 'Valor'),
+          ),
+          SizedBox(height: 10),
+          ElevatedButton(onPressed: _addVenta, child: Text('Agregar Venta')),
+          SizedBox(height: 20),
+          Text('Ventas del día', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          Expanded(
+            child: ListView.builder(
+              itemCount: ventas.length,
+              itemBuilder: (_, i) {
+                final v = ventas[i];
+                return ListTile(
+                  title: Text('${v.nombre} - \$${v.valor.toStringAsFixed(0)}'),
+                  subtitle: Text('Fecha y hora: ${v.fechaHora}'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(icon: Icon(Icons.edit, color: Colors.blue), onPressed: () => _editVenta(i)),
+                      IconButton(
+                        icon: Icon(Icons.delete, color: Colors.red),
+                        onPressed: () => showDialog<bool>(
                           context: context,
-                          builder: (context) => AlertDialog(
-                            title: Text("¿Eliminar esta venta?"),
-                            content: Text(
-                                "¿Estás seguro de que deseas eliminar esta venta del día?"),
+                          builder: (_) => AlertDialog(
+                            title: Text('¿Eliminar esta venta?'),
+                            content: Text('¿Seguro?'),
                             actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, false),
-                                child: Text("Cancelar"),
-                              ),
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, true),
-                                child: Text("Eliminar",
-                                    style: TextStyle(color: Colors.red)),
-                              ),
+                              TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancelar')),
+                              TextButton(onPressed: () => Navigator.pop(context, true), child: Text('Eliminar', style: TextStyle(color: Colors.red))),
                             ],
                           ),
-                        );
-                        if (confirm ?? false) eliminarVenta(index);
-                      },
-                    ),
-                  );
-                },
-              ),
+                        ).then((ok) {
+                          if (ok ?? false) _removeVenta(i);
+                        }),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
-            SizedBox(height: 10),
-            Text(
-              'Total: \$${total.toStringAsFixed(0)}',
-              style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green),
-            ),
-            SizedBox(height: 5),
-            Text("Creada por Marco Cerda con mucho amor ❤️ - v1.0.1",
-                style: TextStyle(fontSize: 12)),
-          ],
-        ),
+          ),
+          SizedBox(height: 10),
+          Text('Total: \$${total.toStringAsFixed(0)}',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.green)),
+        ],
       ),
     );
   }
@@ -342,76 +352,93 @@ class HistorialPage extends StatefulWidget {
   _HistorialPageState createState() => _HistorialPageState();
 }
 
-class _HistorialPageState extends State<HistorialPage> {
+class _HistorialPageState extends State<HistorialPage> with TickerProviderStateMixin {
+  late TabController _tabController;
   List<Map<String, dynamic>> historial = [];
 
   @override
   void initState() {
     super.initState();
-    cargarHistorial();
-  }
-
-  Future<void> cargarHistorial() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? datos = prefs.getString("historial_dias");
-    if (datos != null) {
-      setState(() {
-        historial = List<Map<String, dynamic>>.from(jsonDecode(datos));
+    _tabController = TabController(length: 2, vsync: this)
+      ..addListener(() {
+        if (!_tabController.indexIsChanging) _loadHistorial();
       });
-    }
+    _loadHistorial();
   }
 
-  void eliminarDia(int index) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    historial.removeAt(index);
-    await prefs.setString("historial_dias", jsonEncode(historial));
-    setState(() {});
+  String get _historyKey => _tabController.index == 0 ? 'lore_historial' : 'mimi_historial';
+
+  Future<void> _loadHistorial() async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = prefs.getString(_historyKey);
+    setState(() {
+      historial = data != null
+          ? List<Map<String, dynamic>>.from(jsonDecode(data))
+          : [];
+    });
+  }
+
+  Future<void> _saveHistorial() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_historyKey, jsonEncode(historial));
+  }
+
+  void _removeDia(int i) {
+    setState(() => historial.removeAt(i));
+    _saveHistorial();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Historial de Días")),
-      body: ListView.builder(
-        itemCount: historial.length,
-        itemBuilder: (context, index) {
-          final dia = historial[index];
-          return ListTile(
-            title: Text("Fecha: ${dia['fecha']} - Total: \$${dia['total']}"),
-            trailing: IconButton(
-              icon: Icon(Icons.delete, color: Colors.red),
-              onPressed: () async {
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: Text("¿Eliminar este día?"),
-                    content: Text(
-                        "¿Estás seguro de que deseas eliminar el historial del día ${dia['fecha']}?"),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: Text("Cancelar"),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        child: Text("Eliminar",
-                            style: TextStyle(color: Colors.red)),
-                      ),
-                    ],
-                  ),
-                );
-                if (confirm ?? false) eliminarDia(index);
-              },
-            ),
-            onTap: () {
-              Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) =>
-                    DetalleDiaPage(ventas: dia['ventas'], fecha: dia['fecha']),
-              ));
-            },
-          );
-        },
+      appBar: AppBar(
+        title: Text('Historial de Días'),
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: [Tab(text: 'Lore'), Tab(text: 'Mimi')],
+        ),
       ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [ _histList(), _histList() ],
+      ),
+    );
+  }
+
+  Widget _histList() {
+    return ListView.builder(
+      itemCount: historial.length,
+      itemBuilder: (_, i) {
+        final d = historial[i];
+        return ListTile(
+          title: Text('Fecha: ${d['fecha']} - Total: \$${(d['total'] as num).toStringAsFixed(0)}'),
+          trailing: IconButton(
+            icon: Icon(Icons.delete, color: Colors.red),
+            onPressed: () => showDialog<bool>(
+              context: context,
+              builder: (_) => AlertDialog(
+                title: Text('¿Eliminar este día?'),
+                content: Text('¿Seguro?'),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancelar')),
+                  TextButton(onPressed: () => Navigator.pop(context, true), child: Text('Eliminar', style: TextStyle(color: Colors.red))),
+                ],
+              ),
+            ).then((ok) {
+              if (ok ?? false) _removeDia(i);
+            }),
+          ),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => DetalleDiaPage(
+                ventas: d['ventas'],
+                fecha: d['fecha'],
+                historyKey: _historyKey,
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -419,15 +446,20 @@ class _HistorialPageState extends State<HistorialPage> {
 class DetalleDiaPage extends StatefulWidget {
   final List ventas;
   final String fecha;
+  final String historyKey;
 
-  DetalleDiaPage({required this.ventas, required this.fecha});
+  DetalleDiaPage({
+    required this.ventas,
+    required this.fecha,
+    required this.historyKey,
+  });
 
   @override
   _DetalleDiaPageState createState() => _DetalleDiaPageState();
 }
 
 class _DetalleDiaPageState extends State<DetalleDiaPage> {
-  List ventasEditable = [];
+  late List ventasEditable;
 
   @override
   void initState() {
@@ -435,63 +467,47 @@ class _DetalleDiaPageState extends State<DetalleDiaPage> {
     ventasEditable = List.from(widget.ventas);
   }
 
-  void editarVenta(int index) async {
-    TextEditingController nombreController =
-        TextEditingController(text: ventasEditable[index]['nombre']);
-    TextEditingController valorController =
-        TextEditingController(text: ventasEditable[index]['valor'].toString());
-
-    final confirm = await showDialog<bool>(
+  void _editVentaDetalle(int i) async {
+    final nCtrl = TextEditingController(text: ventasEditable[i]['nombre']);
+    final vCtrl = TextEditingController(text: ventasEditable[i]['valor'].toString());
+    final ok = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text("Editar Venta"),
+      builder: (_) => AlertDialog(
+        title: Text('Editar Venta'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
-              controller: nombreController,
-              decoration: InputDecoration(labelText: "Nombre"),
-            ),
-            TextField(
-              controller: valorController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(labelText: "Valor"),
-            ),
+            TextField(controller: nCtrl, decoration: InputDecoration(labelText: 'Nombre')),
+            TextField(controller: vCtrl, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: 'Valor')),
           ],
         ),
         actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text("Cancelar")),
-          TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: Text("Guardar")),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: Text('Guardar')),
         ],
       ),
     );
-
-    if (confirm ?? false) {
+    if (ok ?? false) {
       setState(() {
-        ventasEditable[index]['nombre'] = nombreController.text;
-        ventasEditable[index]['valor'] =
-            double.tryParse(valorController.text) ?? 0;
+        ventasEditable[i]['nombre'] = nCtrl.text;
+        ventasEditable[i]['valor'] = double.tryParse(vCtrl.text) ?? ventasEditable[i]['valor'];
       });
-      // Guardar inmediatamente los cambios en SharedPreferences
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      String? historial = prefs.getString("historial_dias");
-      if (historial != null) {
-        List<dynamic> historialList = jsonDecode(historial);
-        for (var dia in historialList) {
+      final nuevoTotal = ventasEditable.fold<double>(0.0, (sum, v) {
+        final val = v['valor'];
+        return sum + ((val is num) ? val.toDouble() : 0.0);
+      });
+      final prefs = await SharedPreferences.getInstance();
+      final hist = prefs.getString(widget.historyKey);
+      if (hist != null) {
+        final listH = jsonDecode(hist) as List<dynamic>;
+        for (var dia in listH) {
           if (dia['fecha'] == widget.fecha) {
             dia['ventas'] = ventasEditable;
-            // ✅ ACTUALIZAMOS EL TOTAL
-            double nuevoTotal = ventasEditable.fold(
-                0.0, (sum, venta) => sum + (venta['valor'] ?? 0));
             dia['total'] = nuevoTotal;
             break;
           }
         }
-        await prefs.setString("historial_dias", jsonEncode(historialList));
+        await prefs.setString(widget.historyKey, jsonEncode(listH));
       }
     }
   }
@@ -499,16 +515,15 @@ class _DetalleDiaPageState extends State<DetalleDiaPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Ventas del ${widget.fecha}")),
+      appBar: AppBar(title: Text('Ventas del ${widget.fecha}')),
       body: ListView.builder(
         itemCount: ventasEditable.length,
-        itemBuilder: (context, index) {
-          final venta = ventasEditable[index];
+        itemBuilder: (_, i) {
+          final v = ventasEditable[i];
           return ListTile(
-            title: Text(
-                "${venta['nombre']} - \$${venta['valor'].toStringAsFixed(0)}"),
-            subtitle: Text("Fecha y hora: ${venta['fechaHora']}"),
-            onTap: () => editarVenta(index),
+            title: Text('${v['nombre']} - \$${v['valor'].toStringAsFixed(0)}'),
+            subtitle: Text('Fecha y hora: ${v['fechaHora']}'),
+            onTap: () => _editVentaDetalle(i),
           );
         },
       ),
